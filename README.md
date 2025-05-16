@@ -23,9 +23,9 @@ small draw app.
 ## dist
 1. Install installer tool
     ```
-    pdm install pyinstaller
+    pdm add pyinstaller
     ```
 2. Generate dist
     ```
-    pyinstaller .
+    pyinstaller whiteboard.spec
     ```
