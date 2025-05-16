@@ -4,3 +4,10 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .pdm-python
+.venv/
+.vscode/
+build/
+dist/
+*.egg-info/
+pdm.lock
+

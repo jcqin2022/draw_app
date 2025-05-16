@@ -5,7 +5,7 @@ description = "Default template for PDM package"
 authors = [
     {name = "jcqin", email = "jcqin@ra.rockwell.com"},
 ]
-dependencies = ["pyside6>=6.9.0", "fastapi>=0.115.12", "uvicorn>=0.34.2", "python-socketio>=5.13.0", "requests>=2.32.3", "pytest>=8.3.5"]
+dependencies = ["pyside6>=6.9.0", "fastapi>=0.115.12", "uvicorn>=0.34.2", "python-socketio>=5.13.0", "requests>=2.32.3", "pytest>=8.3.5", "pyinstaller>=6.13.0"]
 requires-python = "==3.12.*"
 readme = "README.md"
 license = {text = "MIT"}
