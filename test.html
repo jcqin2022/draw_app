@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Web白板客户端</title>
+    <style>
+        #canvas {
+            border: 1px solid #ccc;
+            cursor: crosshair;
+        }
+        .toolbar {
+            margin: 10px 0;
+            padding: 10px;
+            background: #f5f5f5;
+        }
+        .color-picker {
+            width: 30px;
+            height: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <button onclick="setTool('line')">直线</button>
+        <button onclick="setTool('circle')">圆形</button>
+        <input type="color" id="colorPicker" class="color-picker" value="#000000">
+        <label>粗细: 
+            <input type="range" id="lineWidth" min="1" max="20" value="2">
+        </label>
+        <button onclick="clearCanvas()">清空画板</button>
+    </div>
+    <canvas id="canvas" width="800" height="600"></canvas>
+
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let isDrawing = false;
+        let startX, startY;
+        let currentTool = 'line';
+        let color = '#000000';
+        let lineWidth = 2;
+        let history = [];
+
+        // Socket.IO连接
+        const socket = io('http://localhost:8000', {
+            transports: ['websocket'], // Use WebSocket transport only
+            reconnection: true,
+            reconnectionDelay: 1000,
+        });
+
+        // 初始化事件监听
+        initEventListeners();
+        initSocketListeners();
+
+        function initEventListeners() {
+            // 工具设置
+            document.getElementById('colorPicker').addEventListener('input', e => {
+                color = e.target.value;
+            });
+            document.getElementById('lineWidth').addEventListener('input', e => {
+                lineWidth = parseInt(e.target.value);
+            });
+
+            // 画布事件
+            canvas.addEventListener('mousedown', startDrawing);
+            canvas.addEventListener('mousemove', drawPreview);
+            canvas.addEventListener('mouseup', finishDrawing);
+            canvas.addEventListener('mouseout', cancelDrawing);
+        }
+
+        function initSocketListeners() {
+            socket.on('connect', () => {
+                console.log('Connected to server');
+            });
+
+            socket.on('init', history => {
+                redrawCanvas(history);
+            });
+
+            socket.on('new_shape', shape => {
+                drawShape(shape, false);
+            });
+
+            socket.on('clear', () => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            });
+
+            socket.on('disconnect', () => {
+                console.log('Disconnected from server');
+            });
+        }
+
+        // 绘图逻辑
+        function startDrawing(e) {
+            isDrawing = true;
+            const rect = canvas.getBoundingClientRect();
+            startX = e.clientX - rect.left;
+            startY = e.clientY - rect.top;
+        }
+
+        function drawPreview(e) {
+            if (!isDrawing) return;
+            const rect = canvas.getBoundingClientRect();
+            const currentX = e.clientX - rect.left;
+            const currentY = e.clientY - rect.top;
+            
+            // 清除临时绘图
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            redrawCanvas(getHistory());
+            
+            // 绘制预览
+            ctx.beginPath();
+            drawShape({
+                type: currentTool,
+                start: [startX, startY],
+                end: [currentX, currentY],
+                color,
+                width: lineWidth
+            }, true);
+        }
+
+        function finishDrawing(e) {
+            if (!isDrawing) return;
+            isDrawing = false;
+            
+            const rect = canvas.getBoundingClientRect();
+            const endX = e.clientX - rect.left;
+            const endY = e.clientY - rect.top;
+
+            const shape = {
+                type: currentTool,
+                start: [startX, startY],
+                end: [endX, endY],
+                color,
+                width: lineWidth
+            };
+
+            drawShape(shape, false);
+
+            socket.emit('draw_shape', shape);
+        }
+        
+        function cancelDrawing() {
+            // isDrawing = false;
+            // redrawCanvas(getHistory());
+        }
+        // 图形渲染
+        function drawShape(shape, isPreview = true) {
+            ctx.save();
+            ctx.strokeStyle = shape.color;
+            ctx.lineWidth = shape.width;
+            ctx.beginPath();
+
+            if (shape.type === 'line') {
+                ctx.moveTo(...shape.start);
+                ctx.lineTo(...shape.end);
+            } else if (shape.type === 'circle') {
+                const dx = shape.end[0] - shape.start[0];
+                const dy = shape.end[1] - shape.start[1];
+                const radius = Math.sqrt(dx*dx + dy*dy);
+                ctx.arc(shape.start[0], shape.start[1], radius, 0, Math.PI * 2);
+            }
+
+            ctx.stroke();
+            ctx.restore();
+
+            if (!isPreview) {
+                addToHistory(shape);
+            }
+        }
+
+        // 工具函数
+        function setTool(tool) {
+            currentTool = tool;
+        }
+
+        function clearCanvas() {
+            socket.emit('clear');
+        }
+
+        function redrawCanvas(history) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            history.forEach(shape => drawShape(shape, false));
+        }
+
+        // 本地历史记录（可选）
+        let drawingHistory = [];
+        function addToHistory(shape) {
+            drawingHistory.push(shape);
+        }
+        function getHistory() {
+            return [...drawingHistory];
+        }
+    </script>
+</body>
+</html>
