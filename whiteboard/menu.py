@@ -1,4 +1,3 @@
-
 from PySide6.QtGui import QAction
 
 class WBMenu:
@@ -22,6 +21,10 @@ class WBMenu:
         line_action.triggered.connect(lambda: self.whiteboard.set_drawing_tool("line"))
         shapes_menu.addAction(line_action)
 
+        dotted_line_action = QAction("Dotted Line", self.whiteboard)
+        dotted_line_action.triggered.connect(lambda: self.whiteboard.set_drawing_tool("dotted_line"))
+        shapes_menu.addAction(dotted_line_action)
+
         circle_action = QAction("Circle", self.whiteboard)
         circle_action.triggered.connect(lambda: self.whiteboard.set_drawing_tool("circle"))
         shapes_menu.addAction(circle_action)
@@ -30,9 +33,9 @@ class WBMenu:
         rect_action.triggered.connect(lambda: self.whiteboard.set_drawing_tool("rect"))
         shapes_menu.addAction(rect_action)
 
-        rect_action = QAction("Curve", self.whiteboard)
-        rect_action.triggered.connect(lambda: self.whiteboard.set_drawing_tool("curve"))
-        shapes_menu.addAction(rect_action)
+        curve_action = QAction("Curve", self.whiteboard)
+        curve_action.triggered.connect(lambda: self.whiteboard.set_drawing_tool("curve"))
+        shapes_menu.addAction(curve_action)
 
         # Colors menu
         colors_menu = menu_bar.addMenu("Colors")

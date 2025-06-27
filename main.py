@@ -53,6 +53,25 @@ async def draw_line(x: float, y: float, width: float, height:float, color: str):
     signals.add_shape.emit(data)
     return {"status": "line drawn"}
 
+@app.post("/draw_dotted_line")
+async def draw_dotted_line(x: float, y: float, width: float, height: float, color: str, dot_interval: float = 5):
+    """
+    Draw a dotted line on the whiteboard.
+    x, y: start coordinates
+    width, height: line dimensions
+    color: line color
+    dot_interval: space between dots (default: 5)
+    """
+    data = {
+        "type": "dotted_line",
+        "start": (x, y),
+        "end": (x + width, y + height),
+        "color": color,
+        "dot_interval": dot_interval
+    }
+    signals.add_shape.emit(data)
+    return {"status": "dotted line drawn"}
+
 @app.post("/draw_ellipse")
 async def draw_ellipse(x: float, y: float, rx: float, ry: float, color: str):
     data = {
@@ -63,6 +82,23 @@ async def draw_ellipse(x: float, y: float, rx: float, ry: float, color: str):
     }
     signals.add_shape.emit(data)
     return {"status": "ellipse drawn"} 
+
+@app.post("/draw_circle")
+async def draw_circle(x: float, y: float, radius: float, color: str):
+    """
+    Draw a circle with specified center position and radius.
+    x, y: center coordinates
+    radius: circle radius
+    color: circle color
+    """
+    data = {
+        "type": "circle",
+        "start": (x - radius, y - radius),
+        "end": (x + radius, y + radius),
+        "color": color
+    }
+    signals.add_shape.emit(data)
+    return {"status": "circle drawn"}
     
 @app.post("/draw_rect")
 async def draw_rect(x: float, y: float, width: float, height:float, color: str):

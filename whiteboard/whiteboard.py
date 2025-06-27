@@ -1,4 +1,3 @@
-
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QGraphicsView, QGraphicsScene,
     QGraphicsEllipseItem, QGraphicsLineItem, QGraphicsRectItem, QGraphicsPathItem, QVBoxLayout, QWidget
@@ -32,6 +31,7 @@ class WhiteboardWindow(QMainWindow):
         self.temp_item = None
         self.color = QColor("#000000")
         self.pen_width = 2  # 默认线宽
+        self.dot_interval = 5  # Default dot interval for dotted lines
 
     def init_ui(self):
         self.setGeometry(100, 
@@ -44,6 +44,9 @@ class WhiteboardWindow(QMainWindow):
         # Add menu bar
         self.menu = WBMenu(self)
 
+    def set_dot_interval(self, interval: float):
+        """Set the interval for dotted lines"""
+        self.dot_interval = interval
 
     def add_remote_shape(self, shape_data):
         """处理来自网络的绘图指令"""
@@ -55,12 +58,26 @@ class WhiteboardWindow(QMainWindow):
             x1, y1 = shape_data['start']
             x2, y2 = shape_data['end']
             item = QGraphicsLineItem(x1, y1, x2, y2)
+        elif shape_data['type'] == 'dotted_line':
+            x1, y1 = shape_data['start']
+            x2, y2 = shape_data['end']
+            dot_interval = shape_data.get('dot_interval', 5)
+            # Create dotted line style
+            pen.setStyle(Qt.DotLine)
+            pen.setDashPattern([1, dot_interval])  # [dot size, space]
+            item = QGraphicsLineItem(x1, y1, x2, y2)
         elif shape_data['type'] == 'circle':
             x1, y1 = shape_data['start']
             x2, y2 = shape_data['end']
-            radius = ((x2 - x1)**2 + (y2 - y1)**2)**0.5
-            item = QGraphicsEllipseItem(x1 - radius, y1 - radius, 
-                                       radius * 2, radius * 2)
+            # Handle both explicit radius (from API) and calculated radius (from GUI)
+            if 'radius' in shape_data:
+                # API call with explicit radius
+                radius = shape_data['radius']
+                item = QGraphicsEllipseItem(x1, y1, radius * 2, radius * 2)
+            else:
+                # GUI drawing with start/end points
+                radius = ((x2 - x1)**2 + (y2 - y1)**2)**0.5  # Euclidean distance
+                item = QGraphicsEllipseItem(x1, y1, radius * 2, radius * 2)
         elif shape_data['type'] == 'rect':
             x1, y1 = shape_data['start']
             x2, y2 = shape_data['end']
@@ -118,14 +135,18 @@ class WhiteboardWindow(QMainWindow):
             if event.button() == Qt.LeftButton:
                 widget_pos = event.position().toPoint()
                 self.start_point = self.view.mapToScene(widget_pos)
-                # self.start_point = self.view.mapToScene(event.scenePosition().toPoint())
-                if self.current_tool == "line":
+                if self.current_tool in ["line", "dotted_line"]:
                     self.temp_item = QGraphicsLineItem()
+                    if self.current_tool == "dotted_line":
+                        pen = self.temp_item.pen()
+                        pen.setStyle(Qt.DotLine)
+                        pen.setDashPattern([1, self.dot_interval])
+                        self.temp_item.setPen(pen)
                     self.scene.addItem(self.temp_item)
-                if self.current_tool == "circle":
+                elif self.current_tool == "circle":
                     self.temp_item = QGraphicsEllipseItem()
                     self.scene.addItem(self.temp_item)
-                if self.current_tool == "rect":
+                elif self.current_tool == "rect":
                     self.temp_item = QGraphicsRectItem()
                     self.scene.addItem(self.temp_item)
                 elif self.current_tool == "curve":
@@ -134,6 +155,10 @@ class WhiteboardWindow(QMainWindow):
                     self.path = QPainterPath()
                     self.path.moveTo(self.start_point)
                     self.points = [self.start_point]
+                # elif self.current_tool == "dotted_line":
+                #     # For dotted lines, initialize a temporary line item
+                #     self.temp_item = QGraphicsLineItem()
+                #     self.scene.addItem(self.temp_item)
 
         except Exception as e:
             print(f"Error in mousePressEvent: {e}")
@@ -143,17 +168,25 @@ class WhiteboardWindow(QMainWindow):
             if event.buttons() & Qt.LeftButton and self.temp_item:
                 widget_pos = event.position().toPoint()
                 end_point = self.view.mapToScene(widget_pos)
-                if self.current_tool == "line":
+                if self.current_tool in ["line", "dotted_line"]:
                     if isinstance(self.temp_item, QGraphicsLineItem):
                         self.temp_item.setLine(
                             self.start_point.x(), self.start_point.y(),
                             end_point.x(), end_point.y()
                         )
+                        if self.current_tool == "dotted_line":
+                            pen = self.temp_item.pen()
+                            pen.setStyle(Qt.DotLine)
+                            pen.setDashPattern([1, self.dot_interval])
+                            self.temp_item.setPen(pen)
                     else:
                         self.temp_item = QGraphicsLineItem()
                         self.scene.addItem(self.temp_item)
                 elif self.current_tool == "circle":
-                    radius = ((end_point - self.start_point)).manhattanLength()
+                    # Use Euclidean distance for consistent circle drawing
+                    dx = end_point.x() - self.start_point.x()
+                    dy = end_point.y() - self.start_point.y()
+                    radius = (dx**2 + dy**2)**0.5
                     self.temp_item.setRect(
                         self.start_point.x() - radius,
                         self.start_point.y() - radius,
@@ -172,6 +205,16 @@ class WhiteboardWindow(QMainWindow):
                     self.path.lineTo(end_point)
                     self.temp_item.setPath(self.path)
                     self.points.append(end_point) 
+                # elif self.current_tool == "dotted_line":
+                #     # Update the end point of the temporary line item
+                #     if isinstance(self.temp_item, QGraphicsLineItem):
+                #         self.temp_item.setLine(
+                #             self.start_point.x(), self.start_point.y(),
+                #             end_point.x(), end_point.y()
+                #         )
+                #     else:
+                #         self.temp_item = QGraphicsLineItem()
+                #         self.scene.addItem(self.temp_item)
         except Exception as e:
             print(f"Error in mouseMoveEvent: {e}")
 
@@ -180,20 +223,26 @@ class WhiteboardWindow(QMainWindow):
             if event.button() == Qt.LeftButton and self.temp_item:
                 widget_pos = event.position().toPoint()
                 end_point = self.view.mapToScene(widget_pos)
+                
+                # Base shape data
                 shape_data = {
                     "type": self.current_tool,
                     "start": (self.start_point.x(), self.start_point.y()),
-                    "points": [{"x":p.x(), "y":p.y()} for p in self.points],
                     "end": (end_point.x(), end_point.y()),
                     "color": self.color.name() if self.temp_item else "#000000"
                 }
+                
+                # Add points only for curve type
+                if self.current_tool == "curve":
+                    if hasattr(self, 'points'):
+                        shape_data["points"] = [{"x":p.x(), "y":p.y()} for p in self.points]
+                        delattr(self, 'points')  # Clean up points after use
 
-                self.scene.removeItem(self.temp_item)  # 移除临时图形
-                self.add_remote_shape(shape_data)  # 使用统一方法添加
-
+                self.scene.removeItem(self.temp_item)  # Remove temporary shape
+                self.add_remote_shape(shape_data)  # Add final shape
                 self.history.append(shape_data)
                 print(f"Shape added to history: {shape_data}")
                 self.temp_item = None
-                # sio.emit('new_shape', shape_data)
+
         except Exception as e:
             print(f"Error in mouseReleaseEvent: {e}")
